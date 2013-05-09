@@ -80,15 +80,32 @@ public class MainActivity extends Activity {
             Log.d(TAG, "account: " + email);
         }
 
-        credential = GoogleAccountCredential.usingOAuth2(this, YouTubeScopes.YOUTUBE, YouTubeScopes.YOUTUBE_READONLY, YouTubeScopes.YOUTUBE_UPLOAD, YouTubeScopes.YOUTUBEPARTNER);
+        credential = GoogleAccountCredential.usingOAuth2(this, YouTubeScopes.YOUTUBE, YouTubeScopes.YOUTUBE_READONLY, YouTubeScopes.YOUTUBE_UPLOAD,
+                YouTubeScopes.YOUTUBEPARTNER);
         credential.setSelectedAccountName(email);
-        youtube = new YouTube.Builder(AndroidHttp.newCompatibleTransport(),
-                new GsonFactory(), 
-                credential).setApplicationName("LookingGlass/1.0").build();
-        
-        checkGooglePlayServicesAvailable();
+        new AuthTask().execute();
+    }
 
-        new InitTask().execute();
+    private boolean tryAuth() {
+        try {
+            Log.e(TAG, "Token: " + credential.getToken());
+            Log.e(TAG, "LOOKS GOOD?");
+            youtube = new YouTube.Builder(AndroidHttp.newCompatibleTransport(),
+                    new GsonFactory(),
+                    credential).setApplicationName("LookingGlass/1.0").build();
+
+            Log.e(TAG, "LOOKS GOOD!");
+            return true;
+        } catch (GooglePlayServicesAvailabilityException playEx) {
+            checkGooglePlayServicesAvailable();
+        } catch (UserRecoverableAuthException userRecoverableException) {
+            startActivityForResult(userRecoverableException.getIntent(), REQUEST_AUTHORIZATION);
+        } catch (GoogleAuthException fatalException) {
+            Log.e(TAG, "GoogleAuthException error " + fatalException.getMessage(), fatalException);
+        } catch (IOException fatalException) {
+            Log.e(TAG, "IOException error " + fatalException.getMessage(), fatalException);
+        }
+        return false;
     }
 
     private boolean checkGooglePlayServicesAvailable() {
@@ -112,30 +129,36 @@ public class MainActivity extends Activity {
         });
     }
 
-    public class InitTask extends AsyncTask<Void, Void, Boolean> {
-
-        @Override
-        protected Boolean doInBackground(Void... params) {
-            return init();
-        }
-    }
-
-    public boolean init() {
-        try {
-            Log.e(TAG, "Token: " + GoogleAuthUtil.getToken(this, email, "oauth2:" + YouTubeScopes.YOUTUBE));
-            search();
-            return true;
-        } catch (GooglePlayServicesAvailabilityException playEx) {
-            checkGooglePlayServicesAvailable();
-        } catch (UserRecoverableAuthException userRecoverableException) {
-            startActivityForResult(userRecoverableException.getIntent(), REQUEST_AUTHORIZATION);
-        } catch (GoogleAuthException fatalException) {
-            Log.e(TAG, "GoogleAuthException error " + fatalException.getMessage(), fatalException);
-        } catch (IOException fatalException) {
-            Log.e(TAG, "IOException error " + fatalException.getMessage(), fatalException);
-        }
-        return false;
-    }
+  public class AuthTask extends AsyncTask<Void, Void, Boolean> {
+      @Override
+      protected Boolean doInBackground(Void... params) {
+          return tryAuth();
+      }
+  }
+    
+//    public class InitTask extends AsyncTask<Void, Void, Boolean> {
+//
+//        @Override
+//        protected Boolean doInBackground(Void... params) {
+//            return init();
+//        }
+//    }
+//
+//    public boolean init() {
+//        try {
+//            Log.e(TAG, "Token: " + GoogleAuthUtil.getToken(this, email, "oauth2:" + YouTubeScopes.YOUTUBE));
+//            return true;
+//        } catch (GooglePlayServicesAvailabilityException playEx) {
+//            checkGooglePlayServicesAvailable();
+//        } catch (UserRecoverableAuthException userRecoverableException) {
+//            startActivityForResult(userRecoverableException.getIntent(), REQUEST_AUTHORIZATION);
+//        } catch (GoogleAuthException fatalException) {
+//            Log.e(TAG, "GoogleAuthException error " + fatalException.getMessage(), fatalException);
+//        } catch (IOException fatalException) {
+//            Log.e(TAG, "IOException error " + fatalException.getMessage(), fatalException);
+//        }
+//        return false;
+//    }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -146,173 +169,172 @@ public class MainActivity extends Activity {
                 } else {
                     Log.e(TAG, "NOT AUTHED!!");
                 }
-                new InitTask().execute();
+                tryAuth();
                 break;
         }
     }
 
-    public void test() {
-        try {
-            // Create request to list broadcasts.
-            YouTube.LiveBroadcasts.List liveBroadcastRequest =
-                    youtube.liveBroadcasts().list("id,snippet");
-
-            // Modify results to have broadcasts in all states.
-            liveBroadcastRequest.setBroadcastStatus("all");
-
-            // List request is executed and list of broadcasts are returned
-            LiveBroadcastList returnedListResponse = liveBroadcastRequest.execute();
-
-            // Get the list of broadcasts associated with the user.
-            List<LiveBroadcast> returnedList = returnedListResponse.getItems();
-
-            // Print out returned results.
-            System.out.println("\n================== Returned Broadcasts ==================\n");
-            for (LiveBroadcast broadcast : returnedList) {
-                System.out.println("  - Id: " + broadcast.getId());
-                System.out.println("  - Title: " + broadcast.getSnippet().getTitle());
-                System.out.println("  - Description: " + broadcast.getSnippet().getDescription());
-                System.out.println("  - Published At: " + broadcast.getSnippet().getPublishedAt());
-                System.out.println(
-                        "  - Scheduled Start Time: " + broadcast.getSnippet().getScheduledStartTime());
-                System.out.println(
-                        "  - Scheduled End Time: " + broadcast.getSnippet().getScheduledEndTime());
-                System.out.println("\n-------------------------------------------------------------\n");
-            }
-        } catch (Exception e) {
-
-        }
-    }
-
-    public void start() throws IOException {
-        String title = "Test Broadcast";
-        Log.e(TAG, "You chose " + title + " for broadcast title.");
-
-        // Create a snippet with title, scheduled start and end times.
-        LiveBroadcastSnippet broadcastSnippet = new LiveBroadcastSnippet();
-        broadcastSnippet.setTitle(title);
-        broadcastSnippet.setScheduledStartTime(new DateTime("2024-01-30T00:00:00.000Z"));
-        broadcastSnippet.setScheduledEndTime(new DateTime("2024-01-31T00:00:00.000Z"));
-
-        // Create LiveBroadcastStatus with privacy status.
-        LiveBroadcastStatus status = new LiveBroadcastStatus();
-        status.setPrivacyStatus("private");
-
-        LiveBroadcast broadcast = new LiveBroadcast();
-        broadcast.setKind("youtube#liveBroadcast");
-        broadcast.setSnippet(broadcastSnippet);
-        broadcast.setStatus(status);
-
-        // Create the insert request
-        YouTube.LiveBroadcasts.Insert liveBroadcastInsert =
-                youtube.liveBroadcasts().insert("snippet,status", broadcast);
-
-        // Request is executed and inserted broadcast is returned
-        LiveBroadcast returnedBroadcast = liveBroadcastInsert.execute();
-
-        // Print out returned results.
-        Log.e(TAG, "\n================== Returned Broadcast ==================\n");
-        Log.e(TAG, "  - Id: " + returnedBroadcast.getId());
-        Log.e(TAG, "  - Title: " + returnedBroadcast.getSnippet().getTitle());
-        Log.e(TAG, "  - Description: " + returnedBroadcast.getSnippet().getDescription());
-        Log.e(TAG, "  - Published At: " + returnedBroadcast.getSnippet().getPublishedAt());
-        Log.e(TAG,
-                "  - Scheduled Start Time: " + returnedBroadcast.getSnippet().getScheduledStartTime());
-        Log.e(TAG,
-                "  - Scheduled End Time: " + returnedBroadcast.getSnippet().getScheduledEndTime());
-
-        // Get the user's selected title for stream.
-        title = "Test Stream";
-        Log.e(TAG, "You chose " + title + " for stream title.");
-
-        // Create a snippet with title.
-        LiveStreamSnippet streamSnippet = new LiveStreamSnippet();
-        streamSnippet.setTitle(title);
-
-        // Create content distribution network with format and ingestion type.
-        LiveStreamCdn cdn = new LiveStreamCdn();
-        cdn.setFormat("1080p");
-        cdn.setIngestionType("rtmp");
-
-        LiveStream stream = new LiveStream();
-        stream.setKind("youtube#liveStream");
-        stream.setSnippet(streamSnippet);
-        stream.setCdn(cdn);
-
-        // Create the insert request
-        YouTube.LiveStreams.Insert liveStreamInsert =
-                youtube.liveStreams().insert("snippet,cdn", stream);
-
-        // Request is executed and inserted stream is returned
-        LiveStream returnedStream = liveStreamInsert.execute();
-
-        // Print out returned results.
-        Log.e(TAG, "\n================== Returned Stream ==================\n");
-        Log.e(TAG, "  - Id: " + returnedStream.getId());
-        Log.e(TAG, "  - Title: " + returnedStream.getSnippet().getTitle());
-        Log.e(TAG, "  - Description: " + returnedStream.getSnippet().getDescription());
-        Log.e(TAG, "  - Published At: " + returnedStream.getSnippet().getPublishedAt());
-
-        // Create the bind request
-        YouTube.LiveBroadcasts.Bind liveBroadcastBind =
-                youtube.liveBroadcasts().bind(returnedBroadcast.getId(), "id,contentDetails");
-
-        // Set stream id to bind
-        liveBroadcastBind.setStreamId(returnedStream.getId());
-
-        // Request is executed and bound broadcast is returned
-        returnedBroadcast = liveBroadcastBind.execute();
-
-        // Print out returned results.
-        Log.e(TAG, "\n================== Returned Bound Broadcast ==================\n");
-        Log.e(TAG, "  - Broadcast Id: " + returnedBroadcast.getId());
-        Log.e(TAG, "  - Bound Stream Id: " + returnedBroadcast.getContentDetails().getBoundStreamId());
-
-    }
-
-    private void search() {
-        try {
-
-            // Get query term from user.
-            String queryTerm = "turtles";
-
-            YouTube.Search.List search = youtube.search().list("id,snippet");
-
-            /*
-             * It is important to set your developer key from the Google Developer Console for
-             * non-authenticated requests (found under the API Access tab at this link:
-             * code.google.com/apis/). This is good practice and increased your quota.
-             */
-            String apiKey = "AIzaSyB6hjJoY4GK_3macccQXtFl5GYjXnSPFfU";
-            search.setKey(apiKey);
-            search.setQ(queryTerm);
-            /*
-             * We are only searching for videos (not playlists or channels). If we were searching for
-             * more, we would add them as a string like this: "video,playlist,channel".
-             */
-            search.setType("video");
-            /*
-             * This method reduces the info returned to only the fields we need and makes calls more
-             * efficient.
-             */
-            search.setFields("items(id/kind,id/videoId,snippet/title,snippet/thumbnails/default/url)");
-            search.setMaxResults((long) 25);
-            SearchListResponse searchResponse = search.execute();
-
-            List<SearchResult> searchResultList = searchResponse.getItems();
-
-            if (searchResultList != null) {
-//              prettyPrint(searchResultList.iterator(), queryTerm);
-                for (SearchResult result : searchResultList) {
-                    Log.e(TAG, result.toPrettyString());
-                }
-            }
-        } catch (GoogleJsonResponseException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (Throwable t) {
-            t.printStackTrace();
-        }
-    }
+//    public void test() {
+//        try {
+//            // Create request to list broadcasts.
+//            YouTube.LiveBroadcasts.List liveBroadcastRequest =
+//                    youtube.liveBroadcasts().list("id,snippet");
+//
+//            // Modify results to have broadcasts in all states.
+//            liveBroadcastRequest.setBroadcastStatus("all");
+//
+//            // List request is executed and list of broadcasts are returned
+//            LiveBroadcastList returnedListResponse = liveBroadcastRequest.execute();
+//
+//            // Get the list of broadcasts associated with the user.
+//            List<LiveBroadcast> returnedList = returnedListResponse.getItems();
+//
+//            // Print out returned results.
+//            System.out.println("\n================== Returned Broadcasts ==================\n");
+//            for (LiveBroadcast broadcast : returnedList) {
+//                System.out.println("  - Id: " + broadcast.getId());
+//                System.out.println("  - Title: " + broadcast.getSnippet().getTitle());
+//                System.out.println("  - Description: " + broadcast.getSnippet().getDescription());
+//                System.out.println("  - Published At: " + broadcast.getSnippet().getPublishedAt());
+//                System.out.println(
+//                        "  - Scheduled Start Time: " + broadcast.getSnippet().getScheduledStartTime());
+//                System.out.println(
+//                        "  - Scheduled End Time: " + broadcast.getSnippet().getScheduledEndTime());
+//                System.out.println("\n-------------------------------------------------------------\n");
+//            }
+//        } catch (Exception e) {
+//
+//        }
+//    }
+//
+//    public void start() throws IOException {
+//        String title = "Test Broadcast";
+//        Log.e(TAG, "You chose " + title + " for broadcast title.");
+//
+//        // Create a snippet with title, scheduled start and end times.
+//        LiveBroadcastSnippet broadcastSnippet = new LiveBroadcastSnippet();
+//        broadcastSnippet.setTitle(title);
+//        broadcastSnippet.setScheduledStartTime(new DateTime("2024-01-30T00:00:00.000Z"));
+//        broadcastSnippet.setScheduledEndTime(new DateTime("2024-01-31T00:00:00.000Z"));
+//
+//        // Create LiveBroadcastStatus with privacy status.
+//        LiveBroadcastStatus status = new LiveBroadcastStatus();
+//        status.setPrivacyStatus("private");
+//
+//        LiveBroadcast broadcast = new LiveBroadcast();
+//        broadcast.setKind("youtube#liveBroadcast");
+//        broadcast.setSnippet(broadcastSnippet);
+//        broadcast.setStatus(status);
+//
+//        // Create the insert request
+//        YouTube.LiveBroadcasts.Insert liveBroadcastInsert =
+//                youtube.liveBroadcasts().insert("snippet,status", broadcast);
+//
+//        // Request is executed and inserted broadcast is returned
+//        LiveBroadcast returnedBroadcast = liveBroadcastInsert.execute();
+//
+//        // Print out returned results.
+//        Log.e(TAG, "\n================== Returned Broadcast ==================\n");
+//        Log.e(TAG, "  - Id: " + returnedBroadcast.getId());
+//        Log.e(TAG, "  - Title: " + returnedBroadcast.getSnippet().getTitle());
+//        Log.e(TAG, "  - Description: " + returnedBroadcast.getSnippet().getDescription());
+//        Log.e(TAG, "  - Published At: " + returnedBroadcast.getSnippet().getPublishedAt());
+//        Log.e(TAG,
+//                "  - Scheduled Start Time: " + returnedBroadcast.getSnippet().getScheduledStartTime());
+//        Log.e(TAG,
+//                "  - Scheduled End Time: " + returnedBroadcast.getSnippet().getScheduledEndTime());
+//
+//        // Get the user's selected title for stream.
+//        title = "Test Stream";
+//        Log.e(TAG, "You chose " + title + " for stream title.");
+//
+//        // Create a snippet with title.
+//        LiveStreamSnippet streamSnippet = new LiveStreamSnippet();
+//        streamSnippet.setTitle(title);
+//
+//        // Create content distribution network with format and ingestion type.
+//        LiveStreamCdn cdn = new LiveStreamCdn();
+//        cdn.setFormat("1080p");
+//        cdn.setIngestionType("rtmp");
+//
+//        LiveStream stream = new LiveStream();
+//        stream.setKind("youtube#liveStream");
+//        stream.setSnippet(streamSnippet);
+//        stream.setCdn(cdn);
+//
+//        // Create the insert request
+//        YouTube.LiveStreams.Insert liveStreamInsert =
+//                youtube.liveStreams().insert("snippet,cdn", stream);
+//
+//        // Request is executed and inserted stream is returned
+//        LiveStream returnedStream = liveStreamInsert.execute();
+//
+//        // Print out returned results.
+//        Log.e(TAG, "\n================== Returned Stream ==================\n");
+//        Log.e(TAG, "  - Id: " + returnedStream.getId());
+//        Log.e(TAG, "  - Title: " + returnedStream.getSnippet().getTitle());
+//        Log.e(TAG, "  - Description: " + returnedStream.getSnippet().getDescription());
+//        Log.e(TAG, "  - Published At: " + returnedStream.getSnippet().getPublishedAt());
+//
+//        // Create the bind request
+//        YouTube.LiveBroadcasts.Bind liveBroadcastBind =
+//                youtube.liveBroadcasts().bind(returnedBroadcast.getId(), "id,contentDetails");
+//
+//        // Set stream id to bind
+//        liveBroadcastBind.setStreamId(returnedStream.getId());
+//
+//        // Request is executed and bound broadcast is returned
+//        returnedBroadcast = liveBroadcastBind.execute();
+//
+//        // Print out returned results.
+//        Log.e(TAG, "\n================== Returned Bound Broadcast ==================\n");
+//        Log.e(TAG, "  - Broadcast Id: " + returnedBroadcast.getId());
+//        Log.e(TAG, "  - Bound Stream Id: " + returnedBroadcast.getContentDetails().getBoundStreamId());
+//
+//    }
+//
+//    private void search() {
+//        try {
+//
+//            // Get query term from user.
+//            String queryTerm = "turtles";
+//
+//            YouTube.Search.List search = youtube.search().list("id,snippet");
+//
+//            /*
+//             * It is important to set your developer key from the Google Developer Console for
+//             * non-authenticated requests (found under the API Access tab at this link:
+//             * code.google.com/apis/). This is good practice and increased your quota.
+//             */
+////            search.setKey(apiKey);
+//            search.setQ(queryTerm);
+//            /*
+//             * We are only searching for videos (not playlists or channels). If we were searching for
+//             * more, we would add them as a string like this: "video,playlist,channel".
+//             */
+//            search.setType("video");
+//            /*
+//             * This method reduces the info returned to only the fields we need and makes calls more
+//             * efficient.
+//             */
+//            search.setFields("items(id/kind,id/videoId,snippet/title,snippet/thumbnails/default/url)");
+//            search.setMaxResults((long) 25);
+//            SearchListResponse searchResponse = search.execute();
+//
+//            List<SearchResult> searchResultList = searchResponse.getItems();
+//
+//            if (searchResultList != null) {
+////              prettyPrint(searchResultList.iterator(), queryTerm);
+//                for (SearchResult result : searchResultList) {
+//                    Log.e(TAG, result.toPrettyString());
+//                }
+//            }
+//        } catch (GoogleJsonResponseException e) {
+//            e.printStackTrace();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        } catch (Throwable t) {
+//            t.printStackTrace();
+//        }
+//    }
 }
