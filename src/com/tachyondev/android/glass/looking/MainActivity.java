@@ -15,23 +15,13 @@ limitations under the License.
  */
 package com.tachyondev.android.glass.looking;
 
-import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.List;
 
 import android.accounts.Account;
-import android.accounts.AccountManager;
-import android.accounts.AccountManagerCallback;
-import android.accounts.AccountManagerFuture;
-import android.accounts.AuthenticatorException;
-import android.accounts.OperationCanceledException;
 import android.app.Activity;
 import android.app.Dialog;
-import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
@@ -41,28 +31,14 @@ import com.google.android.gms.auth.GoogleAuthUtil;
 import com.google.android.gms.auth.GooglePlayServicesAvailabilityException;
 import com.google.android.gms.auth.UserRecoverableAuthException;
 import com.google.android.gms.common.GooglePlayServicesUtil;
-//import com.google.android.gms.common.GooglePlayServicesUtil;
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.auth.oauth2.CredentialStore;
 import com.google.api.client.extensions.android.http.AndroidHttp;
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
-import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.extensions.android.accounts.GoogleAccountManager;
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
-import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.http.HttpTransport;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
-import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.util.DateTime;
 import com.google.api.services.youtube.YouTube;
-import com.google.api.services.youtube.YouTube.Channels;
-import com.google.api.services.youtube.YouTube.LiveStreams;
 import com.google.api.services.youtube.YouTubeScopes;
-import com.google.api.services.youtube.model.Channel;
 import com.google.api.services.youtube.model.LiveBroadcast;
 import com.google.api.services.youtube.model.LiveBroadcastList;
 import com.google.api.services.youtube.model.LiveBroadcastSnippet;
@@ -72,6 +48,7 @@ import com.google.api.services.youtube.model.LiveStreamCdn;
 import com.google.api.services.youtube.model.LiveStreamSnippet;
 import com.google.api.services.youtube.model.SearchListResponse;
 import com.google.api.services.youtube.model.SearchResult;
+//import com.google.android.gms.common.GooglePlayServicesUtil;
 
 //import com.google.common.collect.Lists;
 
@@ -103,10 +80,10 @@ public class MainActivity extends Activity {
             Log.d(TAG, "account: " + email);
         }
 
-        credential = GoogleAccountCredential.usingOAuth2(this, YouTubeScopes.YOUTUBE, YouTubeScopes.YOUTUBE_READONLY);
+        credential = GoogleAccountCredential.usingOAuth2(this, YouTubeScopes.YOUTUBE);
         credential.setSelectedAccountName(email);
         youtube = new YouTube.Builder(AndroidHttp.newCompatibleTransport(),
-                new GsonFactory(),
+                new GsonFactory(), 
                 credential).setApplicationName("LookingGlass/1.0").build();
 
         checkGooglePlayServicesAvailable();
@@ -306,7 +283,6 @@ public class MainActivity extends Activity {
              * non-authenticated requests (found under the API Access tab at this link:
              * code.google.com/apis/). This is good practice and increased your quota.
              */
-            String apiKey = "AIzaSyB6hjJoY4GK_3macccQXtFl5GYjXnSPFfU";
 //            search.setKey(apiKey);
             search.setQ(queryTerm);
             /*
