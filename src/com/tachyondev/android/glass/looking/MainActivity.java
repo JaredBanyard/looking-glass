@@ -80,12 +80,12 @@ public class MainActivity extends Activity {
             Log.d(TAG, "account: " + email);
         }
 
-        credential = GoogleAccountCredential.usingOAuth2(this, YouTubeScopes.YOUTUBE);
+        credential = GoogleAccountCredential.usingOAuth2(this, YouTubeScopes.YOUTUBE, YouTubeScopes.YOUTUBE_READONLY, YouTubeScopes.YOUTUBE_UPLOAD, YouTubeScopes.YOUTUBEPARTNER);
         credential.setSelectedAccountName(email);
         youtube = new YouTube.Builder(AndroidHttp.newCompatibleTransport(),
                 new GsonFactory(), 
                 credential).setApplicationName("LookingGlass/1.0").build();
-
+        
         checkGooglePlayServicesAvailable();
 
         new InitTask().execute();
@@ -283,7 +283,8 @@ public class MainActivity extends Activity {
              * non-authenticated requests (found under the API Access tab at this link:
              * code.google.com/apis/). This is good practice and increased your quota.
              */
-//            search.setKey(apiKey);
+            String apiKey = "AIzaSyB6hjJoY4GK_3macccQXtFl5GYjXnSPFfU";
+            search.setKey(apiKey);
             search.setQ(queryTerm);
             /*
              * We are only searching for videos (not playlists or channels). If we were searching for
