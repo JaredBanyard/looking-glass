@@ -30,7 +30,6 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.params.BasicHttpParams;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
@@ -55,6 +54,7 @@ import com.google.api.services.youtube.model.LiveBroadcastStatus;
 import com.google.api.services.youtube.model.LiveStream;
 import com.google.api.services.youtube.model.LiveStreamCdn;
 import com.google.api.services.youtube.model.LiveStreamSnippet;
+import com.google.gson.Gson;
 
 public class MainActivity extends Activity {
 
@@ -69,7 +69,7 @@ public class MainActivity extends Activity {
 
     private Handler mHandler = new Handler();
 
-    private static String scope = YouTubeScopes.YOUTUBE;
+    private static String scope = YouTubeScopes.YOUTUBEPARTNER;
 
     private static String email;
 
@@ -274,18 +274,14 @@ public class MainActivity extends Activity {
             HttpPost httppost = new HttpPost("https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,snippet,contentDetails,status");
             try {
                 httppost.setHeader("Authorization", "Bearer " + access_token);
-//                BasicHttpParams httpParams = new BasicHttpParams();
-//               httpParams.
-//               httppost.setParams(params);
-//                httppost.setParams(httpParams);
+                httppost.setHeader("Accept", "application/json");
+                httppost.setHeader("Content-Type", "application/json");
 
-//                List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(2);
-//                nameValuePairs.add(new BasicNameValuePair("part", broadcast.toString()));
-//                httppost.setEntity(new UrlEncodedFormEntity(nameValuePairs));
+                Gson gson = new Gson();
+                String json = gson.toJson(broadcast);
+                Log.e(TAG, json);
 
-                Log.e(TAG, broadcast.toString());
-                StringEntity se = new StringEntity(broadcast.toString());
-
+                StringEntity se = new StringEntity(json);
                 httppost.setEntity(se);
 
                 HttpResponse response = httpclient.execute(httppost);
