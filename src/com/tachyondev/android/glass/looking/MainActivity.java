@@ -277,6 +277,8 @@ public class MainActivity extends Activity {
                 httppost.setHeader("Accept", "application/json");
                 httppost.setHeader("Content-Type", "application/json");
 
+                Log.e(TAG, access_token);
+                
                 Gson gson = new Gson();
                 String json = gson.toJson(broadcast);
                 Log.e(TAG, json);
