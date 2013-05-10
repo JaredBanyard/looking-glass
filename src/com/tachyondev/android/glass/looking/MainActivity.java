@@ -15,8 +15,32 @@ limitations under the License.
  */
 package com.tachyondev.android.glass.looking;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.List;
+
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.ResponseHandler;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.BasicResponseHandler;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicNameValuePair;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONTokener;
+
+import com.google.api.client.googleapis.extensions.android.accounts.GoogleAccountManager;
+import com.google.api.services.youtube.YouTube;
+import com.google.api.services.youtube.YouTubeScopes;
 
 import android.accounts.Account;
 import android.app.Activity;
@@ -25,29 +49,17 @@ import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.TextView;
 
-import com.google.android.gms.auth.GoogleAuthException;
-import com.google.android.gms.auth.GoogleAuthUtil;
-import com.google.android.gms.auth.GooglePlayServicesAvailabilityException;
-import com.google.android.gms.auth.UserRecoverableAuthException;
-import com.google.android.gms.common.GooglePlayServicesUtil;
-import com.google.api.client.extensions.android.http.AndroidHttp;
-import com.google.api.client.googleapis.extensions.android.accounts.GoogleAccountManager;
-import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.json.gson.GsonFactory;
-import com.google.api.client.util.DateTime;
-import com.google.api.services.youtube.YouTube;
-import com.google.api.services.youtube.YouTubeScopes;
-import com.google.api.services.youtube.model.LiveBroadcast;
-import com.google.api.services.youtube.model.LiveBroadcastList;
-import com.google.api.services.youtube.model.LiveBroadcastSnippet;
-import com.google.api.services.youtube.model.LiveBroadcastStatus;
-import com.google.api.services.youtube.model.LiveStream;
-import com.google.api.services.youtube.model.LiveStreamCdn;
-import com.google.api.services.youtube.model.LiveStreamSnippet;
-import com.google.api.services.youtube.model.SearchListResponse;
-import com.google.api.services.youtube.model.SearchResult;
+//import com.google.api.client.extensions.android.http.AndroidHttp;
+//import com.google.api.client.googleapis.extensions.android.accounts.GoogleAccountManager;
+//import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
+//import com.google.api.client.http.HttpResponse;
+//import com.google.api.client.http.HttpTransport;
+//import com.google.api.client.json.JsonFactory;
+//import com.google.api.client.json.gson.GsonFactory;
+//import com.google.api.services.youtube.YouTube;
+//import com.google.api.services.youtube.YouTubeScopes;
 //import com.google.android.gms.common.GooglePlayServicesUtil;
 
 //import com.google.common.collect.Lists;
@@ -60,12 +72,29 @@ public class MainActivity extends Activity {
     static final int REQUEST_GOOGLE_PLAY_SERVICES = 0;
     static final int REQUEST_AUTHORIZATION = 1;
 
+    static final String CLIENT_ID = "23860076599-ka381igf74an4fjll153m40f9h0ubnvl.apps.googleusercontent.com";
+
+//    final HttpTransport transport = AndroidHttp.newCompatibleTransport();
+//
+//    final JsonFactory jsonFactory = new GsonFactory();
+
     /** Global instance of Youtube object to make all API requests. */
     private static YouTube youtube;
 
-    GoogleAccountCredential credential;
+//    GoogleAccountCredential credential;
 
-    String email;
+    private static String scope = YouTubeScopes.YOUTUBE + " " +
+            YouTubeScopes.YOUTUBE_READONLY + " " +
+            YouTubeScopes.YOUTUBE_UPLOAD + " " +
+            YouTubeScopes.YOUTUBEPARTNER;
+
+    private static String email;
+
+    private static String device_code;
+    private static String user_code;
+    private static String verification_url;
+    private static int expires_in;
+    private static int interval;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,99 +109,110 @@ public class MainActivity extends Activity {
             Log.d(TAG, "account: " + email);
         }
 
-        credential = GoogleAccountCredential.usingOAuth2(this, YouTubeScopes.YOUTUBE, YouTubeScopes.YOUTUBE_READONLY, YouTubeScopes.YOUTUBE_UPLOAD,
-                YouTubeScopes.YOUTUBEPARTNER);
-        credential.setSelectedAccountName(email);
         new AuthTask().execute();
     }
 
-    private boolean tryAuth() {
-        try {
-            Log.e(TAG, "Token: " + credential.getToken());
-            Log.e(TAG, "LOOKS GOOD?");
-            youtube = new YouTube.Builder(AndroidHttp.newCompatibleTransport(),
-                    new GsonFactory(),
-                    credential).setApplicationName("LookingGlass/1.0").build();
-
-            Log.e(TAG, "LOOKS GOOD!");
-            return true;
-        } catch (GooglePlayServicesAvailabilityException playEx) {
-            checkGooglePlayServicesAvailable();
-        } catch (UserRecoverableAuthException userRecoverableException) {
-            startActivityForResult(userRecoverableException.getIntent(), REQUEST_AUTHORIZATION);
-        } catch (GoogleAuthException fatalException) {
-            Log.e(TAG, "GoogleAuthException error " + fatalException.getMessage(), fatalException);
-        } catch (IOException fatalException) {
-            Log.e(TAG, "IOException error " + fatalException.getMessage(), fatalException);
-        }
-        return false;
-    }
-
-    private boolean checkGooglePlayServicesAvailable() {
-        final int connectionStatusCode = GooglePlayServicesUtil.isGooglePlayServicesAvailable(this);
-        if (GooglePlayServicesUtil.isUserRecoverableError(connectionStatusCode)) {
-            showGooglePlayServicesAvailabilityErrorDialog(connectionStatusCode);
-            return false;
-        }
-        return true;
-    }
-
-    void showGooglePlayServicesAvailabilityErrorDialog(final int connectionStatusCode) {
-        runOnUiThread(new Runnable() {
-
-            public void run() {
-                Dialog dialog =
-                        GooglePlayServicesUtil.getErrorDialog(connectionStatusCode, MainActivity.this,
-                                REQUEST_GOOGLE_PLAY_SERVICES);
-                dialog.show();
-            }
-        });
-    }
-
-  public class AuthTask extends AsyncTask<Void, Void, Boolean> {
-      @Override
-      protected Boolean doInBackground(Void... params) {
-          return tryAuth();
-      }
-  }
-    
-//    public class InitTask extends AsyncTask<Void, Void, Boolean> {
-//
-//        @Override
-//        protected Boolean doInBackground(Void... params) {
-//            return init();
-//        }
-//    }
-//
-//    public boolean init() {
-//        try {
-//            Log.e(TAG, "Token: " + GoogleAuthUtil.getToken(this, email, "oauth2:" + YouTubeScopes.YOUTUBE));
-//            return true;
-//        } catch (GooglePlayServicesAvailabilityException playEx) {
-//            checkGooglePlayServicesAvailable();
-//        } catch (UserRecoverableAuthException userRecoverableException) {
-//            startActivityForResult(userRecoverableException.getIntent(), REQUEST_AUTHORIZATION);
-//        } catch (GoogleAuthException fatalException) {
-//            Log.e(TAG, "GoogleAuthException error " + fatalException.getMessage(), fatalException);
-//        } catch (IOException fatalException) {
-//            Log.e(TAG, "IOException error " + fatalException.getMessage(), fatalException);
-//        }
-//        return false;
-//    }
-
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        switch (requestCode) {
-            case REQUEST_AUTHORIZATION:
-                if (resultCode == Activity.RESULT_OK) {
-                    Log.e(TAG, "AUTHED!!");
-                } else {
-                    Log.e(TAG, "NOT AUTHED!!");
+
+    }
+
+    public class AuthTask extends AsyncTask<String, Void, JSONObject>
+    {
+
+        @Override
+        protected JSONObject doInBackground(String... email) {
+            HttpClient httpclient = new DefaultHttpClient();
+            HttpPost httppost = new HttpPost("https://accounts.google.com/o/oauth2/device/code");
+
+            try {
+                // Add your data
+                List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(2);
+                nameValuePairs.add(new BasicNameValuePair("client_id", CLIENT_ID));
+                nameValuePairs.add(new BasicNameValuePair("scope", YouTubeScopes.YOUTUBE));
+
+                httppost.setEntity(new UrlEncodedFormEntity(nameValuePairs));
+
+                // Execute HTTP Post Request
+                HttpResponse response = httpclient.execute(httppost);
+
+                Log.e(TAG, "Status: " + response.getStatusLine());
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent(), "UTF-8"));
+                StringBuilder builder = new StringBuilder();
+                for (String line = null; (line = reader.readLine()) != null;) {
+                    builder.append(line).append("\n");
                 }
-                tryAuth();
-                break;
+                JSONTokener tokener = new JSONTokener(builder.toString());
+                JSONObject json = new JSONObject(tokener);
+                return json;
+            } catch (ClientProtocolException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (JSONException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            return null;
+        }
+        
+
+        @Override
+        protected void onPostExecute(JSONObject json) {
+            if (json != null) {
+                try {
+                    device_code = json.getString("device_code");
+                    user_code = json.getString("user_code");
+                    verification_url = json.getString("verification_url");
+                    expires_in = json.getInt("expires_in");
+                    interval = json.getInt("interval");
+                    displayAuth();
+                } catch (JSONException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            } 
         }
     }
+    
+    private void displayAuth() {
+        TextView titleView = (TextView) findViewById(R.id.tv_title);
+        TextView urlView = (TextView) findViewById(R.id.tv_first);
+        TextView codeView = (TextView) findViewById(R.id.tv_second);
+        TextView instructionsView = (TextView) findViewById(R.id.tv_third);     
+        
+        urlView.setText("Go to: " + verification_url);
+        codeView.setText("and enter: " + user_code);
+        instructionsView.setText("using your Glass account within " + expires_in + " seconds.");
+    }
+
+//    
+//    public static HttpResponse makeRequest(String path, Map params) throws Exception 
+//    {
+//        //instantiates httpclient to make request
+//        DefaultHttpClient httpclient = new DefaultHttpClient();
+//
+//        //url with the post data
+//        HttpPost httpost = new HttpPost(path);
+//
+//        //convert parameters into JSON object
+//        JSONObject holder = getJsonObjectFromMap(params);
+//
+//        //passes the results to a string builder/entity
+//        StringEntity se = new StringEntity(holder.toString());
+//
+//        //sets the post request as the resulting string
+//        httpost.setEntity(se);
+//        //sets a request header so the page receving the request
+//        //will know what to do with it
+//        httpost.setHeader("Accept", "application/json");
+//        httpost.setHeader("Content-type", "application/json");
+//
+//        //Handles what is returned from the page 
+//        ResponseHandler responseHandler = new BasicResponseHandler();
+//        return httpclient.execute(httpost, responseHandler);
+//    }
 
 //    public void test() {
 //        try {
