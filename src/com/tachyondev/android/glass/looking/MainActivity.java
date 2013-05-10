@@ -48,7 +48,10 @@ import android.app.Dialog;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
+import android.view.View;
+import android.view.WindowManager.LayoutParams;
 import android.widget.TextView;
 
 //import com.google.api.client.extensions.android.http.AndroidHttp;
@@ -73,15 +76,13 @@ public class MainActivity extends Activity {
     static final int REQUEST_AUTHORIZATION = 1;
 
     static final String CLIENT_ID = "23860076599-ka381igf74an4fjll153m40f9h0ubnvl.apps.googleusercontent.com";
+    static final String CLIENT_SECRET = "Rs19DNVAcc8NezV2pTFg8ea_";
+    static final String GRANT_TYPE = "http://oauth.net/grant_type/device/1.0";
 
-//    final HttpTransport transport = AndroidHttp.newCompatibleTransport();
-//
-//    final JsonFactory jsonFactory = new GsonFactory();
-
+    private Handler mHandler = new Handler();
+    
     /** Global instance of Youtube object to make all API requests. */
     private static YouTube youtube;
-
-//    GoogleAccountCredential credential;
 
     private static String scope = YouTubeScopes.YOUTUBE + " " +
             YouTubeScopes.YOUTUBE_READONLY + " " +
@@ -95,6 +96,9 @@ public class MainActivity extends Activity {
     private static String verification_url;
     private static int expires_in;
     private static int interval;
+    private static String access_token;
+    private static String token_type;
+    private static String refresh_token;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -108,6 +112,8 @@ public class MainActivity extends Activity {
             email = googleAccounts[0].name;
             Log.d(TAG, "account: " + email);
         }
+        
+        getWindow().addFlags(LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         new AuthTask().execute();
     }
@@ -151,42 +157,137 @@ public class MainActivity extends Activity {
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (JSONException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
             return null;
         }
-        
 
         @Override
         protected void onPostExecute(JSONObject json) {
             if (json != null) {
+                Log.e(TAG, json.toString());
                 try {
                     device_code = json.getString("device_code");
                     user_code = json.getString("user_code");
                     verification_url = json.getString("verification_url");
                     expires_in = json.getInt("expires_in");
                     interval = json.getInt("interval");
-                    displayAuth();
+                    displayAuth(0);
+                    new VerifyTask().execute();
                 } catch (JSONException e) {
-                    // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
-            } 
+            }
         }
     }
-    
-    private void displayAuth() {
+
+    private void displayAuth(int state) {
         TextView titleView = (TextView) findViewById(R.id.tv_title);
         TextView urlView = (TextView) findViewById(R.id.tv_first);
         TextView codeView = (TextView) findViewById(R.id.tv_second);
-        TextView instructionsView = (TextView) findViewById(R.id.tv_third);     
-        
-        urlView.setText("Go to: " + verification_url);
-        codeView.setText("and enter: " + user_code);
-        instructionsView.setText("using your Glass account within " + expires_in + " seconds.");
+        TextView instructionsView = (TextView) findViewById(R.id.tv_third);
+
+        switch(state) {
+            case 0:
+                urlView.setText("Go to: " + verification_url);
+                codeView.setText("and enter: " + user_code);
+                break;
+            case 1:
+                instructionsView.setText("using your Glass account within " + expires_in + " seconds.");
+                break;
+            case 2:
+                urlView.setVisibility(View.GONE);
+                codeView.setText("DONE!");
+                instructionsView.setVisibility(View.GONE);
+                break;
+        }
     }
 
+    public class VerifyTask extends AsyncTask<String, Void, JSONObject>
+    {
+
+        @Override
+        protected JSONObject doInBackground(String... params) {
+            HttpClient httpclient = new DefaultHttpClient();
+            HttpPost httppost = new HttpPost("https://accounts.google.com/o/oauth2/token");
+
+            try {
+                // Add your data
+                List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(2);
+                nameValuePairs.add(new BasicNameValuePair("client_id", CLIENT_ID));
+                nameValuePairs.add(new BasicNameValuePair("client_secret", CLIENT_SECRET));
+                nameValuePairs.add(new BasicNameValuePair("code", device_code));
+                nameValuePairs.add(new BasicNameValuePair("grant_type", GRANT_TYPE));
+
+                httppost.setEntity(new UrlEncodedFormEntity(nameValuePairs));
+
+                // Execute HTTP Post Request
+                HttpResponse response = httpclient.execute(httppost);
+
+                Log.e(TAG, "Status: " + response.getStatusLine());
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent(), "UTF-8"));
+                StringBuilder builder = new StringBuilder();
+                for (String line = null; (line = reader.readLine()) != null;) {
+                    builder.append(line).append("\n");
+                }
+                JSONTokener tokener = new JSONTokener(builder.toString());
+                JSONObject json = new JSONObject(tokener);
+                return json;
+            } catch (ClientProtocolException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(JSONObject json) {
+            if (json != null) {
+                Log.e(TAG, json.toString());
+                try {
+                    access_token = json.getString("access_token");
+                    token_type = json.getString("token_type");
+                    refresh_token = json.getString("refresh_token");
+                    expires_in = json.getInt("expires_in");
+                    displayAuth(2);
+                    test();
+                } catch (JSONException e) {
+                    expires_in -= interval;
+                    displayAuth(1);
+                    mHandler.postDelayed(VerifyRunnable, interval * 1000);
+                }
+            }
+        }
+    }
+    
+    private Runnable VerifyRunnable = new Runnable() {
+        @Override
+        public void run() {
+            new VerifyTask().execute();
+        }        
+    };
+
+    private void test() {
+        
+//        AccountCredential a;
+//        
+//        credential = GoogleAccountCredential.usingOAuth2(this, YouTubeScopes.YOUTUBE, YouTubeScopes.YOUTUBE_READONLY, YouTubeScopes.YOUTUBE_UPLOAD,
+//                YouTubeScopes.YOUTUBEPARTNER);
+//        credential.setSelectedAccountName(email);
+//    
+//
+//            Log.e(TAG, "Token: " + credential.getToken());
+//            Log.e(TAG, "LOOKS GOOD?");
+//            
+//            new YouTube.Builder(arg0, arg1, arg2)
+//            youtube = new YouTube.Builder(AndroidHttp.newCompatibleTransport(),
+//                    new GsonFactory(),
+//                    credential).setApplicationName("LookingGlass/1.0").build();
+    }
 //    
 //    public static HttpResponse makeRequest(String path, Map params) throws Exception 
 //    {
