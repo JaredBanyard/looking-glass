@@ -69,7 +69,7 @@ public class MainActivity extends Activity {
 
     private Handler mHandler = new Handler();
 
-    private static String scope = YouTubeScopes.YOUTUBEPARTNER;
+    private static String scope = YouTubeScopes.YOUTUBE;
 
     private static String email;
 
