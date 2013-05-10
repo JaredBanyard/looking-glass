@@ -30,6 +30,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.params.BasicHttpParams;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
@@ -270,11 +271,12 @@ public class MainActivity extends Activity {
         @Override
         protected JSONObject doInBackground(Void... params) {
             HttpClient httpclient = new DefaultHttpClient();
-            HttpPost httppost = new HttpPost("https://www.googleapis.com/youtube/v3/liveBroadcasts");
+            HttpPost httppost = new HttpPost("https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,snippet,contentDetails,status");
             try {
                 httppost.setHeader("Authorization", "Bearer " + access_token);
 //                BasicHttpParams httpParams = new BasicHttpParams();
-//                broadcast.getpa
+//               httpParams.
+//               httppost.setParams(params);
 //                httppost.setParams(httpParams);
 
 //                List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(2);
